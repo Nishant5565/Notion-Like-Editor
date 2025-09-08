@@ -7,7 +7,7 @@ import type { EmojiItem } from "@tiptap/extension-emoji"
 import { useMenuNavigation } from "@/hooks/use-menu-navigation"
 
 // --- Lib ---
-import { getElementOverflowPosition } from "@/lib/tiptap-collab-utils"
+import { getElementOverflowPosition } from "@/lib/tiptap-editor-utils"
 
 // --- UI Primitives ---
 import { Button, ButtonGroup } from "@/components/tiptap-ui-primitive/button"

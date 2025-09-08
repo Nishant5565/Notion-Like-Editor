@@ -1,8 +1,12 @@
 import type { Node as TiptapNode } from "@tiptap/pm/model"
 import { NodeSelection, Selection, TextSelection } from "@tiptap/pm/state"
 import type { Editor } from "@tiptap/react"
+import axios from "axios"
 
 export const MAX_FILE_SIZE = 5 * 1024 * 1024 // 5MB
+
+// Backend configuration - Update this with your actual backend URL
+export const BACKEND_UPLOAD_URL = "https://mow-backend-production.up.railway.app/api/upload/article-image"
 
 export const MAC_SYMBOLS: Record<string, string> = {
   mod: "⌘",
@@ -302,17 +306,63 @@ export const handleImageUpload = async (
     )
   }
 
-  // For demo/testing: Simulate upload progress. In production, replace the following code
-  // with your own upload implementation.
-  for (let progress = 0; progress <= 100; progress += 10) {
-    if (abortSignal?.aborted) {
-      throw new Error("Upload cancelled")
-    }
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    onProgress?.({ progress })
+  // Validate file type
+  if (!file.type.startsWith('image/')) {
+    throw new Error("Only image files are allowed")
   }
 
-  return "/images/tiptap-ui-placeholder-image.jpg"
+  try {
+    // Create FormData
+    const formData = new FormData()
+    formData.append('file', file)
+    formData.append('title' , "why-tanjiro-is-best")
+    formData.append('fileName', file.name)
+    formData.append('fileSize', file.size.toString())
+    formData.append('fileType', file.type)
+
+    // Create axios config with progress tracking
+    const config = {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+      onUploadProgress: (progressEvent: any) => {
+        if (progressEvent.total) {
+          const progress = Math.round((progressEvent.loaded * 100) / progressEvent.total)
+          onProgress?.({ progress })
+        }
+      },
+      // Add abort signal support
+      signal: abortSignal,
+    }
+
+    // Upload to backend
+    const response = await axios.post(BACKEND_UPLOAD_URL, formData, config)
+
+    // Validate response
+    if (!response.data || !response.data.data) {
+      throw new Error("Invalid response from server: missing image URL")
+    }
+
+    // Return the image URL from backend (your backend returns it in 'data' field)
+    return response.data.data
+  } catch (error: any) {
+    // Handle axios errors
+    if (axios.isCancel(error) || error.name === 'AbortError') {
+      throw new Error("Upload cancelled")
+    }
+    
+    if (error.response) {
+      // Server responded with error status
+      const errorMessage = error.response.data?.message || error.response.data?.error || `Server error: ${error.response.status}`
+      throw new Error(errorMessage)
+    } else if (error.request) {
+      // Network error
+      throw new Error("Network error: Unable to reach the server")
+    } else {
+      // Other error
+      throw new Error(error.message || "Unknown error occurred during upload")
+    }
+  }
 }
 
 type ProtocolOptions = {

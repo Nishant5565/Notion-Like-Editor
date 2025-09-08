@@ -4,7 +4,7 @@ import * as React from "react"
 import type { Editor, Range } from "@tiptap/react"
 
 // --- Lib ---
-import { getElementOverflowPosition } from "@/lib/tiptap-collab-utils"
+import { getElementOverflowPosition } from "@/lib/tiptap-editor-utils"
 
 // --- Tiptap UI ---
 import type {

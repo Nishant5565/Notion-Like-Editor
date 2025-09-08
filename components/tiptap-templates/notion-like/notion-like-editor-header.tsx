@@ -1,7 +1,5 @@
 "use client";
 
-import { ThemeToggle } from "@/components/tiptap-templates/notion-like/notion-like-editor-theme-toggle";
-
 // --- Tiptap UI ---
 import { UndoRedoButton } from "@/components/tiptap-ui/undo-redo-button";
 
@@ -24,8 +22,6 @@ export function NotionEditorHeader() {
         </ButtonGroup>
 
         <Separator />
-
-        <ThemeToggle />
 
         <Separator />
       </div>
