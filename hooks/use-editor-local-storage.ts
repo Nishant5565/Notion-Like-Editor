@@ -3,6 +3,7 @@ import { Editor } from "@tiptap/react";
 import { useLocalStorage } from "./use-local-storage";
 import axios from "axios";
 import axiosInstance from "@/config/axiosInstance";
+import API_URL from "@/config/API_URL";
 
 interface EditorContent {
   content: any;
@@ -182,7 +183,7 @@ export function useEditorLocalStorage(
   // Built-in server save function using axios
   const defaultServerSave = useCallback(
     async (content: any, articleId: string) => {
-      const baseUrl = serverSaveOptions?.baseUrl || "http://localhost:5000";
+      const baseUrl = API_URL;
       const response = await axiosInstance.post(
         `article-draft/save-draft/${articleId}`,
         {
