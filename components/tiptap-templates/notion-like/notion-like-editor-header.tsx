@@ -47,7 +47,7 @@ export function NotionEditorHeader({
         </button>
         <span style={{ marginLeft: "10px", fontSize: "12px" }}>
           Last saved:{" "}
-          {Intl.DateTimeFormat("en-US", {
+          {lastModified && Intl.DateTimeFormat("en-US", {
             dateStyle: "medium",
             timeStyle: "short",
           }).format(new Date(lastModified)) || "Never"}

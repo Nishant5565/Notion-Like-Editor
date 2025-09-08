@@ -46,7 +46,6 @@ import { MentionDropdownMenu } from "@/components/tiptap-ui/mention-dropdown-men
 import { SlashDropdownMenu } from "@/components/tiptap-ui/slash-dropdown-menu";
 import { DragContextMenu } from "@/components/tiptap-ui/drag-context-menu";
 
-
 // --- Lib ---
 import { handleImageUpload, MAX_FILE_SIZE } from "@/lib/tiptap-utils";
 
@@ -143,7 +142,8 @@ export function EditorProvider(props: EditorProviderProps) {
       accept: "image/*",
       maxSize: MAX_FILE_SIZE,
       limit: 3,
-      upload: handleImageUpload,
+      upload: (file, onProgress, abortSignal) =>
+        handleImageUpload(file, articleDetails?.title, onProgress, abortSignal),
       onError: (error) => console.error("Upload failed:", error),
     }),
     UniqueID.configure({
@@ -265,7 +265,5 @@ export function NotionEditor({
   placeholder = "Start writing...",
   articleId,
 }: NotionEditorProps) {
-  return (
-      <EditorProvider placeholder={placeholder} articleId={articleId} />
-  );
+  return <EditorProvider placeholder={placeholder} articleId={articleId} />;
 }

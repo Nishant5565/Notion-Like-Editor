@@ -295,6 +295,7 @@ export function isNodeTypeSelected(
  */
 export const handleImageUpload = async (
   file: File,
+  title: string,
   onProgress?: (event: { progress: number }) => void,
   abortSignal?: AbortSignal
 ): Promise<string> => {
@@ -318,7 +319,7 @@ export const handleImageUpload = async (
     // Create FormData
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("title", "why-tanjiro-is-best");
+    formData.append("title", title);
     formData.append("fileName", file.name);
     formData.append("fileSize", file.size.toString());
     formData.append("fileType", file.type);

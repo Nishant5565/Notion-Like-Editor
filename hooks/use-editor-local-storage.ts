@@ -2,6 +2,7 @@ import { useEffect, useCallback, useRef, useState } from "react";
 import { Editor } from "@tiptap/react";
 import { useLocalStorage } from "./use-local-storage";
 import axios from "axios";
+import axiosInstance from "@/config/axiosInstance";
 
 interface EditorContent {
   content: any;
@@ -43,54 +44,161 @@ export function useEditorLocalStorage(
   const lastServerSavedContent = useRef<string | null>(null);
   const isSaving = useRef(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [isLoadingContent, setIsLoadingContent] = useState(false);
+  const [contentLoadError, setContentLoadError] = useState<string | null>(null);
+  const hasInitiallyLoaded = useRef(false);
 
-  // Load content when editor is ready and articleId changes
-  useEffect(() => {
-    if (!editor || !savedContent) return;
+  // Built-in server fetch function
+  const fetchDraftFromServer = async (
+    articleId: string
+  ): Promise<ArticleMetadata> => {
+    const response = await axiosInstance.get(
+      `article-draft/get-draft/${articleId}`
+    );
+    return response.data.data;
+  };
 
+  // Function to validate JSON content
+  const isValidContent = (content: any): boolean => {
     try {
-      // Only set content if the editor is currently empty or has default content
-      const currentContent = editor.getJSON();
-      const isEmpty =
-        !currentContent.content ||
-        currentContent.content.length === 0 ||
-        (currentContent.content.length === 1 &&
-          currentContent.content[0].type === "paragraph" &&
-          (!currentContent.content[0].content ||
-            currentContent.content[0].content.length === 0));
+      if (!content) return false;
 
-      if (isEmpty) {
-        // Set the content from localStorage
-        editor.commands.setContent(savedContent.content);
-        console.log(`Loaded content for article: ${articleId}`);
+      // Check if it's a valid TipTap JSON structure
+      if (typeof content !== "object" || !content.type) {
+        return false;
       }
+      // Basic validation for TipTap document structure
+      return content.type === "doc" || content.content !== undefined;
     } catch (error) {
-      console.error("Error loading content from localStorage:", error);
+      console.error("Content validation error:", error);
+      return false;
     }
-  }, [editor, savedContent, articleId]);
+  };
+
+  // Function to compare dates and determine which content is more recent
+  const getMostRecentContent = (
+    localContent: EditorContent | null,
+    serverData: ArticleMetadata | null
+  ): { source: "local" | "server" | "none"; content: EditorContent | null } => {
+    // If no server data, use local if valid
+    if (!serverData || !serverData.content) {
+      if (localContent && isValidContent(localContent.content)) {
+        return { source: "local", content: localContent };
+      }
+      return { source: "none", content: null };
+    }
+
+    // If no local content or invalid local content, use server
+    if (!localContent || !isValidContent(localContent.content)) {
+      const serverContent: EditorContent = {
+        content: serverData.content.content,
+        lastModified: serverData.updatedAt,
+        title: serverData.title,
+      };
+      return { source: "server", content: serverContent };
+    }
+
+    // Both exist and are valid, compare dates
+    const localDate = new Date(localContent.lastModified);
+    const serverDate = new Date(serverData.updatedAt);
+
+    if (serverDate > localDate) {
+      const serverContent: EditorContent = {
+        content: serverData.content,
+        lastModified: serverData.updatedAt,
+        title: serverData.title,
+      };
+      return { source: "server", content: serverContent };
+    } else {
+      return { source: "local", content: localContent };
+    }
+  };
+
+  // Initial content loading effect
+  useEffect(() => {
+    if (!editor || hasInitiallyLoaded.current || !articleId) return;
+
+    const loadInitialContent = async () => {
+      setIsLoadingContent(true);
+      setContentLoadError(null);
+      hasInitiallyLoaded.current = true;
+
+      try {
+        let serverData: ArticleMetadata | null = null;
+
+        // Try to fetch from server if enabled
+        if (serverSaveOptions?.enabled) {
+          try {
+            const fetchFunction =
+              serverSaveOptions.customFetchFunction || fetchDraftFromServer;
+            serverData = await fetchFunction(articleId);
+            serverSaveOptions.onFetchSuccess?.(serverData);
+            console.log("Fetched content from server:", serverData.content.content);
+          } catch (serverError) {
+            console.warn("Failed to fetch from server:", serverError);
+            serverSaveOptions.onFetchError?.(serverError as Error);
+          }
+        }
+
+        // Get the most recent content
+        const { source, content } = getMostRecentContent(savedContent, serverData);
+
+        console.log(`Using content from: ${source}`);
+
+        if (content) {
+          // If using server content, save it to local storage
+          if (source === "server") {
+            setSavedContent(content);
+            console.log("Saved server content to local storage");
+          }
+
+          // Set content in editor
+          editor.commands.setContent(content.content);
+          lastServerSavedContent.current = JSON.stringify(content.content);
+          console.log(`Loaded content for article: ${articleId} from ${source}`);
+        } else {
+          // No valid content found, start with empty document
+          console.log("No valid content found, starting with empty document");
+          editor.commands.clearContent();
+        }
+
+        setHasUnsavedChanges(false);
+      } catch (error) {
+        console.error("Error during initial content loading:", error);
+        setContentLoadError(
+          error instanceof Error ? error.message : "Unknown error"
+        );
+
+        // Fallback to empty document
+        editor.commands.clearContent();
+      } finally {
+        setIsLoadingContent(false);
+      }
+    };
+
+    loadInitialContent();
+  }, [editor, articleId, serverSaveOptions?.enabled]);
 
   // Built-in server save function using axios
   const defaultServerSave = useCallback(
     async (content: any, articleId: string) => {
       const baseUrl = serverSaveOptions?.baseUrl || "http://localhost:5000";
-      const response = await axios.post(
-        `${baseUrl}/api/articles/save-draft/${articleId}`,
+      const response = await axiosInstance.post(
+        `article-draft/save-draft/${articleId}`,
         {
           articleId,
           content,
-          title: getDocumentTitle(content),
         }
       );
-      return response.data;
+      console.log("Server save response:", response.data);
+      return response.data.status;
     },
     [serverSaveOptions?.baseUrl]
   );
 
   // Save content to server
   const saveToServer = useCallback(async () => {
-    console.log("Attempting to save to server...");
     if (!editor || !serverSaveOptions?.enabled || isSaving.current) return;
-    console.log("Passed initial checks for server save.");
     try {
       const content = editor.getJSON();
       const contentString = JSON.stringify(content);
@@ -108,7 +216,6 @@ export function useEditorLocalStorage(
       lastServerSavedContent.current = contentString;
       setHasUnsavedChanges(false); // Reset unsaved changes flag after successful save
       serverSaveOptions.onSaveSuccess?.(response);
-      console.log(`Content saved to server for article: ${articleId}`);
     } catch (error) {
       console.error("Error saving content to server:", error);
       serverSaveOptions.onSaveError?.(error as Error);
@@ -123,26 +230,29 @@ export function useEditorLocalStorage(
 
     try {
       const content = editor.getJSON();
+
+      // Validate content before saving
+      if (!isValidContent(content)) {
+        console.warn(
+          "Attempting to save invalid content, skipping localStorage save"
+        );
+        return;
+      }
+
       const contentData: EditorContent = {
         content,
         lastModified: new Date().toISOString(),
-        title: getDocumentTitle(content),
       };
 
       setSavedContent(contentData);
-      console.log(`Content saved for article: ${articleId}`);
     } catch (error) {
       console.error("Error saving content to localStorage:", error);
     }
-  }, [editor, setSavedContent, articleId]);
+  }, [editor, setSavedContent]);
 
   // Auto-save functionality with debouncing
   useEffect(() => {
-    console.log(
-      "Setting up auto-save effect, editor:",
-      !!editor
-    );
-    if (!editor) return;
+    if (!editor || !hasInitiallyLoaded.current) return;
 
     let localSaveTimeoutId: NodeJS.Timeout;
     let serverSaveTimeoutId: NodeJS.Timeout;
@@ -151,24 +261,21 @@ export function useEditorLocalStorage(
       console.log("Editor update detected");
       // Mark content as having unsaved changes
       setHasUnsavedChanges(true);
-      
+
       // Clear existing timeouts
       clearTimeout(localSaveTimeoutId);
       clearTimeout(serverSaveTimeoutId);
 
       // Debounce local storage save (1 second)
       localSaveTimeoutId = setTimeout(() => {
-        console.log("Executing local save");
         saveContent();
       }, 1000);
 
-      // Debounce server save (30 seconds)
+      // Debounce server save (10 seconds)
       if (serverSaveOptions?.enabled) {
-        console.log("Setting up server save timeout (30s)");
         serverSaveTimeoutId = setTimeout(() => {
-          console.log("Executing server save from timeout");
           saveToServer();
-        }, 30000); // Back to 30 seconds
+        }, 10000);
       } else {
         console.log(
           "Server save disabled, serverSaveOptions.enabled:",
@@ -185,7 +292,7 @@ export function useEditorLocalStorage(
       clearTimeout(localSaveTimeoutId);
       clearTimeout(serverSaveTimeoutId);
     };
-  }, [editor]); // ← Only depend on editor, not the functions
+  }, [editor, hasInitiallyLoaded.current]);
 
   // Manual save function (saves both locally and to server immediately)
   const manualSave = useCallback(async () => {
@@ -201,6 +308,8 @@ export function useEditorLocalStorage(
     if (editor) {
       editor.commands.clearContent();
     }
+    lastServerSavedContent.current = null;
+    setHasUnsavedChanges(false);
     console.log(`Content cleared for article: ${articleId}`);
   }, [editor, setSavedContent, articleId]);
 
@@ -211,27 +320,9 @@ export function useEditorLocalStorage(
     saveToServer,
     isSaving: isSaving.current,
     hasUnsavedChanges,
+    isLoadingContent,
+    contentLoadError,
     lastModified: savedContent?.lastModified,
     title: savedContent?.title,
   };
-}
-
-// Helper function to extract title from content
-function getDocumentTitle(content: any): string {
-  if (!content || !content.content) return "Untitled";
-
-  // Look for the first heading or paragraph with text
-  for (const node of content.content) {
-    if (node.type === "heading" && node.content?.[0]?.text) {
-      return node.content[0].text;
-    }
-    if (node.type === "paragraph" && node.content?.[0]?.text) {
-      return (
-        node.content[0].text.substring(0, 50) +
-        (node.content[0].text.length > 50 ? "..." : "")
-      );
-    }
-  }
-
-  return "Untitled";
 }
