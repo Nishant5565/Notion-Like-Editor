@@ -42,7 +42,6 @@ import "@/components/tiptap-node/paragraph-node/paragraph-node.scss";
 
 // --- Tiptap UI ---
 import { EmojiDropdownMenu } from "@/components/tiptap-ui/emoji-dropdown-menu";
-import { MentionDropdownMenu } from "@/components/tiptap-ui/mention-dropdown-menu";
 import { SlashDropdownMenu } from "@/components/tiptap-ui/slash-dropdown-menu";
 import { DragContextMenu } from "@/components/tiptap-ui/drag-context-menu";
 
@@ -92,7 +91,6 @@ export function EditorContentArea() {
     >
       <DragContextMenu />
       <EmojiDropdownMenu />
-      <MentionDropdownMenu />
       <SlashDropdownMenu />
       <NotionToolbarFloating />
 

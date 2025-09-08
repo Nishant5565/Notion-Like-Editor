@@ -13,10 +13,8 @@ import { ListIcon } from "@/components/tiptap-icons/list-icon"
 import { ListOrderedIcon } from "@/components/tiptap-icons/list-ordered-icon"
 import { BlockquoteIcon } from "@/components/tiptap-icons/blockquote-icon"
 import { ListTodoIcon } from "@/components/tiptap-icons/list-todo-icon"
-import { AiSparklesIcon } from "@/components/tiptap-icons/ai-sparkles-icon"
 import { MinusIcon } from "@/components/tiptap-icons/minus-icon"
 import { TypeIcon } from "@/components/tiptap-icons/type-icon"
-import { AtSignIcon } from "@/components/tiptap-icons/at-sign-icon"
 import { SmilePlusIcon } from "@/components/tiptap-icons/smile-plus-icon"
 
 // --- Lib ---
@@ -32,7 +30,6 @@ import {
 // --- Tiptap UI ---
 import type { SuggestionItem } from "@/components/tiptap-ui-utils/suggestion-menu"
 import { addEmojiTrigger } from "@/components/tiptap-ui/emoji-trigger-button"
-import { addMentionTrigger } from "@/components/tiptap-ui/mention-trigger-button"
 
 export interface SlashMenuConfig {
   enabledItems?: SlashMenuItemType[]
@@ -44,22 +41,6 @@ export interface SlashMenuConfig {
 }
 
 const texts = {
-  // AI
-  continue_writing: {
-    title: "Continue Writing",
-    subtext: "Continue writing from the current position",
-    aliases: ["continue", "write", "continue writing", "ai"],
-    badge: AiSparklesIcon,
-    group: "AI",
-  },
-  ai_ask_button: {
-    title: "Ask AI",
-    subtext: "Ask AI to generate content",
-    aliases: ["ai", "ask", "generate"],
-    badge: AiSparklesIcon,
-    group: "AI",
-  },
-
   // Style
   text: {
     title: "Text",
@@ -126,13 +107,6 @@ const texts = {
   },
 
   // Insert
-  mention: {
-    title: "Mention",
-    subtext: "Mention a user or item",
-    aliases: ["mention", "user", "item", "tag"],
-    badge: AtSignIcon,
-    group: "Insert",
-  },
   emoji: {
     title: "Emoji",
     subtext: "Insert an emoji",
@@ -170,69 +144,6 @@ export type SlashMenuItemType = keyof typeof texts
 
 const getItemImplementations = () => {
   return {
-    // AI
-    continue_writing: {
-      check: (editor: Editor) => {
-        const { hasContent } = hasContentAbove(editor)
-        const extensionsReady = isExtensionAvailable(editor, [
-          "ai",
-          "aiAdvanced",
-        ])
-        return extensionsReady && hasContent
-      },
-      action: ({ editor }: { editor: Editor }) => {
-        const editorChain = editor.chain().focus()
-
-        const nodeSelectionPosition = findSelectionPosition({ editor })
-
-        if (nodeSelectionPosition !== null) {
-          editorChain.setNodeSelection(nodeSelectionPosition)
-        }
-
-        editorChain.run()
-
-        editor.chain().focus().aiGenerationShow().run()
-
-        requestAnimationFrame(() => {
-          const { hasContent, content } = hasContentAbove(editor)
-
-          const snippet =
-            content.length > 500 ? `...${content.slice(-500)}` : content
-
-          const prompt = hasContent
-            ? `Context: ${snippet}\n\nContinue writing from where the text above ends. Write ONLY ONE SENTENCE. DONT REPEAT THE TEXT.`
-            : "Start writing a new paragraph. Write ONLY ONE SENTENCE."
-
-          editor
-            .chain()
-            .focus()
-            .aiTextPrompt({
-              stream: true,
-              format: "rich-text",
-              text: prompt,
-            })
-            .run()
-        })
-      },
-    },
-    ai_ask_button: {
-      check: (editor: Editor) =>
-        isExtensionAvailable(editor, ["ai", "aiAdvanced"]),
-      action: ({ editor }: { editor: Editor }) => {
-        const editorChain = editor.chain().focus()
-
-        const nodeSelectionPosition = findSelectionPosition({ editor })
-
-        if (nodeSelectionPosition !== null) {
-          editorChain.setNodeSelection(nodeSelectionPosition)
-        }
-
-        editorChain.run()
-
-        editor.chain().focus().aiGenerationShow().run()
-      },
-    },
-
     // Style
     text: {
       check: (editor: Editor) => isNodeInSchema("paragraph", editor),
@@ -290,11 +201,6 @@ const getItemImplementations = () => {
     },
 
     // Insert
-    mention: {
-      check: (editor: Editor) =>
-        isExtensionAvailable(editor, ["mention", "mentionAdvanced"]),
-      action: ({ editor }: { editor: Editor }) => addMentionTrigger(editor),
-    },
     emoji: {
       check: (editor: Editor) =>
         isExtensionAvailable(editor, ["emoji", "emojiPicker"]),
