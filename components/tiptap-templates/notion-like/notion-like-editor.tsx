@@ -56,6 +56,7 @@ import { NotionEditorHeader } from "@/components/tiptap-templates/notion-like/no
 import { MobileToolbar } from "@/components/tiptap-templates/notion-like/notion-like-editor-mobile-toolbar";
 import { NotionToolbarFloating } from "@/components/tiptap-templates/notion-like/notion-like-editor-toolbar-floating";
 import axios from "axios";
+import axiosInstance from "@/config/axiosInstance";
 
 export interface NotionEditorProps {
   placeholder?: string;
@@ -194,8 +195,8 @@ export function EditorProvider(props: EditorProviderProps) {
 
     const fetchArticle = async () => {
       try {
-        const response = await axios.get(
-          `http://localhost:5000/api/articles/details-for-writing/${articleId}`
+        const response = await axiosInstance.get(
+          `articles/details-for-writing/${articleId}`
         );
 
         console.log("Fetched article:", response.data.data);
