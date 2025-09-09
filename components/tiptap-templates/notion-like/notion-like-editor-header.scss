@@ -20,6 +20,12 @@
   background-color: var(--tt-notion-like-editor-header-bg);
   border-bottom: 1px solid var(--tt-notion-like-editor-header-border);
 
+  // media query for smaller screens
+  @media (max-width: 768px) {
+    height: 5rem;
+    padding: 0.5rem;
+  }
+
   &-actions {
     display: flex;
     align-items: center;

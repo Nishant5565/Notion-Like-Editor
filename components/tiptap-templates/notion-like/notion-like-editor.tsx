@@ -106,6 +106,9 @@ export function EditorContentArea() {
 export function EditorProvider(props: EditorProviderProps) {
   const { placeholder = "Start writing...", articleId } = props;
   const [articleDetails, setArticleDetails] = React.useState<any>(null);
+  const [isSubmittingForReview, setIsSubmittingForReview] =
+    React.useState(false);
+  const [submitComment, setSubmitComment] = React.useState("");
   // Create extensions array
   const extensions = [
     StarterKit.configure({
@@ -184,6 +187,7 @@ export function EditorProvider(props: EditorProviderProps) {
     title,
     isSaving,
     hasUnsavedChanges,
+    submitContent,
   } = useEditorLocalStorage(editor, articleId, {
     enabled: true, // ← This is required for server saves
     onSaveSuccess: (response) => console.log("Server saved!", response),
@@ -218,9 +222,43 @@ export function EditorProvider(props: EditorProviderProps) {
       console.error("Manual save failed:", error);
     }
   };
-  const handleSubmitForReview = async () => {
-    console.log("Submit for review clicked");
-    // Implement submission logic here
+
+  const handleSubmitForReview = async (comment?: string) => {
+    if (!editor) {
+      console.error("Editor not available");
+      return;
+    }
+
+    setIsSubmittingForReview(true);
+
+    try {
+      // First, save any pending changes
+      await manualSave();
+
+      // Then submit for review with comment
+      const response = await submitContent(comment);
+
+      console.log("Article submitted for review:", response);
+
+      // Reset comment after successful submission
+      setSubmitComment("");
+
+      // You can add success notification here
+      alert("Article submitted for review successfully!");
+    } catch (error) {
+      console.error("Failed to submit article for review:", error);
+
+      // You can add error notification here
+      alert("Failed to submit article. Please try again.");
+    } finally {
+      setIsSubmittingForReview(false);
+    }
+  };
+
+  // Function to handle submit with comment input
+  const handleSubmitWithComment = () => {
+    const comment = prompt("Add a comment for the review (optional):");
+    handleSubmitForReview(comment || "");
   };
 
   if (!editor) {
@@ -236,9 +274,10 @@ export function EditorProvider(props: EditorProviderProps) {
           articleId={articleId}
           lastModified={lastModified ?? ""}
           handleManualSave={handleManualSave}
-          handleSubmitForReview={handleSubmitForReview}
+          handleSubmitForReview={handleSubmitWithComment}
           isSaving={isSaving}
           hasUnsavedChanges={hasUnsavedChanges}
+          isSubmittingForReview={isSubmittingForReview}
         />
         <div className="md:max-w-[768px] mx-auto px-6 md:px-12">
           <h2 className="text-2xl md:text-3xl font-bold font-sans mx-0 pt-6  ">

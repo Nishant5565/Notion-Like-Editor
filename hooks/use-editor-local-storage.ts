@@ -92,7 +92,7 @@ export function useEditorLocalStorage(
     // If no local content or invalid local content, use server
     if (!localContent || !isValidContent(localContent.content)) {
       const serverContent: EditorContent = {
-        content: serverData.content.content,
+        content: serverData.content,
         lastModified: serverData.updatedAt,
         title: serverData.title,
       };
@@ -134,7 +134,7 @@ export function useEditorLocalStorage(
               serverSaveOptions.customFetchFunction || fetchDraftFromServer;
             serverData = await fetchFunction(articleId);
             serverSaveOptions.onFetchSuccess?.(serverData);
-            console.log("Fetched content from server:", serverData.content.content);
+            console.log("Fetched content from server:", serverData.content);
           } catch (serverError) {
             console.warn("Failed to fetch from server:", serverError);
             serverSaveOptions.onFetchError?.(serverError as Error);
@@ -142,7 +142,10 @@ export function useEditorLocalStorage(
         }
 
         // Get the most recent content
-        const { source, content } = getMostRecentContent(savedContent, serverData);
+        const { source, content } = getMostRecentContent(
+          savedContent,
+          serverData
+        );
 
         console.log(`Using content from: ${source}`);
 
@@ -156,7 +159,9 @@ export function useEditorLocalStorage(
           // Set content in editor
           editor.commands.setContent(content.content);
           lastServerSavedContent.current = JSON.stringify(content.content);
-          console.log(`Loaded content for article: ${articleId} from ${source}`);
+          console.log(
+            `Loaded content for article: ${articleId} from ${source}`
+          );
         } else {
           // No valid content found, start with empty document
           console.log("No valid content found, starting with empty document");
@@ -314,11 +319,56 @@ export function useEditorLocalStorage(
     console.log(`Content cleared for article: ${articleId}`);
   }, [editor, setSavedContent, articleId]);
 
+  // Submit function for final submission
+  const submitContent = useCallback(
+    async (comment?: string) => {
+      if (!editor) {
+        throw new Error("Editor not available");
+      }
+
+      try {
+        const jsonContent = editor.getJSON();
+        const htmlContent = editor.getHTML();
+
+        // Validate content before submitting
+        if (!isValidContent(jsonContent)) {
+          throw new Error("Invalid content cannot be submitted");
+        }
+
+        console.log("Submitting content:", { jsonContent, htmlContent });
+
+        // Use axios to submit the content
+        const response = await axiosInstance.post(
+          `articles/commit-article/${articleId}`,
+          {
+            articleId,
+            contentJSON: jsonContent,
+            contentHTML: htmlContent,
+            comments: comment || "",
+          }
+        );
+
+        console.log("Content submitted successfully:", response.data);
+
+        // Update last server saved content after successful submission
+        lastServerSavedContent.current = JSON.stringify(jsonContent);
+        setHasUnsavedChanges(false);
+
+        return response.data;
+      } catch (error) {
+        console.error("Error submitting content:", error);
+        throw error;
+      }
+    },
+    [editor, articleId]
+  );
+
   return {
     savedContent,
     manualSave,
     clearContent,
     saveToServer,
+    submitContent, // Add this new function
     isSaving: isSaving.current,
     hasUnsavedChanges,
     isLoadingContent,
