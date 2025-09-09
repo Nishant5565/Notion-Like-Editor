@@ -109,63 +109,90 @@ export function EditorProvider(props: EditorProviderProps) {
   const [isSubmittingForReview, setIsSubmittingForReview] =
     React.useState(false);
   const [submitComment, setSubmitComment] = React.useState("");
-  // Create extensions array
-  const extensions = [
-    StarterKit.configure({
-      undoRedo: false, // Disable StarterKit's undo/redo, we'll add it separately
-      horizontalRule: false,
-      dropcursor: {
-        width: 2,
-      },
-      link: { openOnClick: false },
-    }),
-    HorizontalRule,
-    TextAlign.configure({ types: ["heading", "paragraph"] }),
-    Placeholder.configure({
-      placeholder,
-      emptyNodeClass: "is-empty with-slash",
-    }),
-    Mention,
-    Emoji.configure({
-      emojis: gitHubEmojis.filter((emoji) => !emoji.name.includes("regional")),
-      forceFallbackImages: true,
-    }),
-    Mathematics,
-    Superscript,
-    Subscript,
-    Color,
-    TextStyle,
-    TaskList,
-    TaskItem.configure({ nested: true }),
-    Highlight.configure({ multicolor: true }),
-    Selection,
-    Image,
-    ImageUploadNode.configure({
-      accept: "image/*",
-      maxSize: MAX_FILE_SIZE,
-      limit: 3,
-      upload: (file, onProgress, abortSignal) =>
-        handleImageUpload(file, articleDetails?.title, onProgress, abortSignal),
-      onError: (error) => console.error("Upload failed:", error),
-    }),
-    UniqueID.configure({
-      types: [
-        "paragraph",
-        "bulletList",
-        "orderedList",
-        "taskList",
-        "heading",
-        "blockquote",
-        "codeBlock",
-      ],
-    }),
-    Typography,
-    UiState,
-    // Add History extension for undo/redo in local-only mode
-    History.configure({
-      depth: 100,
-    }),
-  ];
+
+  // Create a ref to store the manual save function
+  const manualSaveRef = React.useRef<(() => Promise<void>) | null>(null);
+
+  // Create extensions array with callback
+  const extensions = React.useMemo(
+    () => [
+      StarterKit.configure({
+        undoRedo: false,
+        horizontalRule: false,
+        dropcursor: {
+          width: 2,
+        },
+        link: { openOnClick: false },
+      }),
+      HorizontalRule,
+      TextAlign.configure({ types: ["heading", "paragraph"] }),
+      Placeholder.configure({
+        placeholder,
+        emptyNodeClass: "is-empty with-slash",
+      }),
+      Mention,
+      Emoji.configure({
+        emojis: gitHubEmojis.filter(
+          (emoji) => !emoji.name.includes("regional")
+        ),
+        forceFallbackImages: true,
+      }),
+      Mathematics,
+      Superscript,
+      Subscript,
+      Color,
+      TextStyle,
+      TaskList,
+      TaskItem.configure({ nested: true }),
+      Highlight.configure({ multicolor: true }),
+      Selection,
+      Image,
+      ImageUploadNode.configure({
+        accept: "image/*",
+        maxSize: MAX_FILE_SIZE,
+        limit: 3,
+        upload: (file, onProgress, abortSignal) =>
+          handleImageUpload(
+            file,
+            articleDetails?.title,
+            onProgress,
+            abortSignal
+          ),
+        onError: (error) => console.error("Upload failed:", error),
+        onSuccess: async (url) => {
+          // Call manual save when image upload is successful
+          if (manualSaveRef.current) {
+            try {
+              await manualSaveRef.current();
+            } catch (error) {
+              console.error(
+                "Failed to save content after image upload:",
+                error
+              );
+            }
+          }
+        },
+      }),
+      UniqueID.configure({
+        types: [
+          "paragraph",
+          "bulletList",
+          "orderedList",
+          "taskList",
+          "heading",
+          "blockquote",
+          "codeBlock",
+        ],
+      }),
+      Typography,
+      UiState,
+      // Add History extension for undo/redo in local-only mode
+      History.configure({
+        depth: 100,
+      }),
+    ],
+    [placeholder, articleDetails?.title]
+  );
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -193,6 +220,12 @@ export function EditorProvider(props: EditorProviderProps) {
     onSaveSuccess: (response) => console.log("Server saved!", response),
     onSaveError: (error) => console.log("Server error:", error),
   });
+
+  // Update the ref when manualSave is available
+  React.useEffect(() => {
+    manualSaveRef.current = manualSave;
+  }, [manualSave]);
+
   React.useEffect(() => {
     if (!articleId || !editor) return;
     //fetch article title and set it in the editor
@@ -202,8 +235,6 @@ export function EditorProvider(props: EditorProviderProps) {
         const response = await axiosInstance.get(
           `articles/details-for-writing/${articleId}`
         );
-
-        console.log("Fetched article:", response.data.data);
         setArticleDetails(response.data.data);
       } catch (error) {
         console.error("Failed to fetch article:", error);
@@ -217,7 +248,6 @@ export function EditorProvider(props: EditorProviderProps) {
     console.log("Manual save button clicked");
     try {
       await manualSave();
-      console.log("Manual save completed");
     } catch (error) {
       console.error("Manual save failed:", error);
     }
@@ -237,12 +267,8 @@ export function EditorProvider(props: EditorProviderProps) {
 
       // Then submit for review with comment
       const response = await submitContent(comment);
-
-      console.log("Article submitted for review:", response);
-
       // Reset comment after successful submission
       setSubmitComment("");
-
       // You can add success notification here
       alert("Article submitted for review successfully!");
     } catch (error) {

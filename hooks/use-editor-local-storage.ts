@@ -176,8 +176,7 @@ export function useEditorLocalStorage(
           editor.commands.clearContent();
         }
 
-        // if the saved draft is different from last server saved content, we have unsaved changes
-        setHasUnsavedChanges(true);
+        setHasUnsavedChanges(false);
       } catch (error) {
         setContentLoadError(
           error instanceof Error ? error.message : "Unknown error"
@@ -203,7 +202,6 @@ export function useEditorLocalStorage(
           content,
         }
       );
-      console.log("Server save response:", response.data);
       return response.data.status;
     },
     [serverSaveOptions?.baseUrl]
@@ -271,7 +269,6 @@ export function useEditorLocalStorage(
     let serverSaveTimeoutId: NodeJS.Timeout;
 
     const handleUpdate = () => {
-      console.log("Editor update detected");
       // Mark content as having unsaved changes
       setHasUnsavedChanges(true);
 
@@ -309,6 +306,7 @@ export function useEditorLocalStorage(
 
   // Manual save function (saves both locally and to server immediately)
   const manualSave = useCallback(async () => {
+    console.log("Manual save triggered");
     saveContent();
     if (serverSaveOptions?.enabled) {
       await saveToServer();
@@ -352,9 +350,6 @@ export function useEditorLocalStorage(
             comments: comment || "",
           }
         );
-
-        console.log("Content submitted successfully:", response.data);
-
         // Update last server saved content after successful submission
         lastServerSavedContent.current = JSON.stringify(jsonContent);
         setHasUnsavedChanges(false);
