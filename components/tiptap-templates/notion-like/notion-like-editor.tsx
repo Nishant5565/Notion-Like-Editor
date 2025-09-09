@@ -151,13 +151,9 @@ export function EditorProvider(props: EditorProviderProps) {
         accept: "image/*",
         maxSize: MAX_FILE_SIZE,
         limit: 3,
-        upload: (file, onProgress, abortSignal) =>
-          handleImageUpload(
-            file,
-            articleDetails?.title,
-            onProgress,
-            abortSignal
-          ),
+        upload: (file, onProgress, abortSignal) => {
+          return handleImageUpload(file, articleId, onProgress, abortSignal);
+        },
         onError: (error) => console.error("Upload failed:", error),
         onSuccess: async (url) => {
           // Call manual save when image upload is successful
@@ -172,6 +168,7 @@ export function EditorProvider(props: EditorProviderProps) {
             }
           }
         },
+        
       }),
       UniqueID.configure({
         types: [

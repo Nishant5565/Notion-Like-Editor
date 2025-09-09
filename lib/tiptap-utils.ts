@@ -1,3 +1,4 @@
+import API_URL from "@/config/API_URL";
 import type { Node as TiptapNode } from "@tiptap/pm/model";
 import { NodeSelection, Selection, TextSelection } from "@tiptap/pm/state";
 import type { Editor } from "@tiptap/react";
@@ -7,7 +8,7 @@ export const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB
 
 // Backend configuration - Update this with your actual backend URL
 export const BACKEND_UPLOAD_URL =
-  "https://mow-backend-production.up.railway.app/api/upload/article-image";
+  `${API_URL}upload/article-image`;
 
 export const MAC_SYMBOLS: Record<string, string> = {
   mod: "⌘",
@@ -295,7 +296,7 @@ export function isNodeTypeSelected(
  */
 export const handleImageUpload = async (
   file: File,
-  title: string,
+  articleId: string,
   onProgress?: (event: { progress: number }) => void,
   abortSignal?: AbortSignal
 ): Promise<string> => {
@@ -319,7 +320,7 @@ export const handleImageUpload = async (
     // Create FormData
     const formData = new FormData();
     formData.append("file", file);
-    formData.append("title", title);
+    formData.append("articleId", articleId);
     formData.append("fileName", file.name);
     formData.append("fileSize", file.size.toString());
     formData.append("fileType", file.type);
@@ -328,6 +329,9 @@ export const handleImageUpload = async (
     const config = {
       headers: {
         "Content-Type": "multipart/form-data",
+        Authorization: `Bearer ${
+          (typeof window != undefined && localStorage.getItem("access_token")) || ""
+        }`,
       },
       onUploadProgress: (progressEvent: any) => {
         if (progressEvent.total) {
